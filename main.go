@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"crypto/aes"
 	"crypto/md5"
 	"crypto/sha1"
@@ -9,12 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"github.com/Mrs4s/go-cqhttp/global/terminal"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	easy "github.com/t-tomalak/logrus-easy-formatter"
-	"io"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -26,9 +20,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Mrs4s/go-cqhttp/global/terminal"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	easy "github.com/t-tomalak/logrus-easy-formatter"
+
 	"github.com/Mrs4s/go-cqhttp/server"
-	"github.com/guonaihong/gout"
-	"github.com/tidwall/gjson"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
 
@@ -56,7 +52,7 @@ func init() {
 		TimestampFormat: "2006-01-02 15:04:05",
 		LogFormat:       "[%time%] [%lvl%]: %msg% \n",
 	}
-	w, err := rotatelogs.New(path.Join("logs", "%Y-%m-%d.log"), rotatelogs.WithRotationTime(time.Hour*24))
+	w, err := rotatelogs.New(path.Join("tmp/logs", "%Y-%m-%d.log"), rotatelogs.WithRotationTime(time.Hour*24))
 	if err != nil {
 		log.Errorf("rotatelogs init err: %v", err)
 		panic(err)
@@ -138,12 +134,6 @@ func main() {
 	if len(arg) > 1 {
 		for i := range arg {
 			switch arg[i] {
-			case "update":
-				if len(arg) > i+1 {
-					selfUpdate(arg[i+1])
-				} else {
-					selfUpdate("")
-				}
 			case "key":
 				if len(arg) > i+1 {
 					b := []byte(arg[i+1])
@@ -299,7 +289,6 @@ func main() {
 	b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
 	c := server.Console
 	r := server.Restart
-	go checkUpdate()
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	select {
 	case <-c:
@@ -359,100 +348,6 @@ func OldPasswordDecrypt(encryptedPassword string, key []byte) string {
 		panic("密钥错误")
 	}
 	return string(tea.Decrypt(encrypted))
-}
-
-func checkUpdate() {
-	log.Infof("正在检查更新.")
-	if coolq.Version == "unknown" {
-		log.Warnf("检查更新失败: 使用的 Actions 测试版或自编译版本.")
-		return
-	}
-	var res string
-	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases").BindBody(&res).Do(); err != nil {
-		log.Warnf("检查更新失败: %v", err)
-		return
-	}
-	detail := gjson.Parse(res)
-	if len(detail.Array()) < 1 {
-		return
-	}
-	info := detail.Array()[0]
-	if global.VersionNameCompare(coolq.Version, info.Get("tag_name").Str) {
-		log.Infof("当前有更新的 go-cqhttp 可供更新, 请前往 https://github.com/Mrs4s/go-cqhttp/releases 下载.")
-		log.Infof("当前版本: %v 最新版本: %v", coolq.Version, info.Get("tag_name").Str)
-		return
-	}
-	log.Infof("检查更新完成. 当前已运行最新版本.")
-}
-
-func selfUpdate(imageURL string) {
-	console := bufio.NewReader(os.Stdin)
-	readLine := func() (str string) {
-		str, _ = console.ReadString('\n')
-		return
-	}
-	log.Infof("正在检查更新.")
-	var res string
-	if err := gout.GET("https://api.github.com/repos/Mrs4s/go-cqhttp/releases").BindBody(&res).Do(); err != nil {
-		log.Warnf("检查更新失败: %v", err)
-		return
-	}
-	detail := gjson.Parse(res)
-	if len(detail.Array()) < 1 {
-		return
-	}
-	info := detail.Array()[0]
-	version := info.Get("tag_name").Str
-	if coolq.Version != version {
-		log.Info("当前最新版本为 ", version)
-		log.Warn("是否更新(y/N): ")
-		r := strings.TrimSpace(readLine())
-
-		doUpdate := func() {
-			log.Info("正在更新,请稍等...")
-			url := fmt.Sprintf(
-				"%v/Mrs4s/go-cqhttp/releases/download/%v/go-cqhttp-%v-%v-%v",
-				func() string {
-					if imageURL != "" {
-						return imageURL
-					}
-					return "https://github.com"
-				}(),
-				version,
-				version,
-				runtime.GOOS,
-				runtime.GOARCH,
-			)
-			if runtime.GOOS == "windows" {
-				url = url + ".exe"
-			}
-			resp, err := http.Get(url)
-			if err != nil {
-				fmt.Println(err)
-				log.Error("更新失败!")
-				return
-			}
-			wc := global.WriteCounter{}
-			err, _ = global.UpdateFromStream(io.TeeReader(resp.Body, &wc))
-			fmt.Println()
-			if err != nil {
-				log.Error("更新失败!")
-				return
-			}
-			log.Info("更新完成！")
-		}
-
-		if r == "y" || r == "Y" {
-			doUpdate()
-		} else {
-			log.Warn("已取消更新！")
-		}
-	} else {
-		log.Info("当前版本已经是最新版本!")
-	}
-	log.Info("按 Enter 继续....")
-	readLine()
-	os.Exit(0)
 }
 
 func restart(Args []string) {

@@ -5,3 +5,5 @@ device.json
 codec/
 data/
 logs/
+tmp/
+*.exe

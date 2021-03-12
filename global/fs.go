@@ -27,18 +27,18 @@ import (
 )
 
 const (
-	// ImagePath go-cqhttp使用的图片缓存目录
-	ImagePath = "data/images"
-	// ImagePathOld 兼容旧版go-cqhtto使用的图片缓存目录
-	ImagePathOld = "data/image"
-	// VoicePath go-cqhttp使用的语音缓存目录
-	VoicePath = "data/voices"
-	// VoicePathOld 兼容旧版go-cqhtto使用的语音缓存目录
-	VoicePathOld = "data/record"
-	// VideoPath go-cqhttp使用的视频缓存目录
-	VideoPath = "data/videos"
-	// CachePath go-cqhttp使用的缓存目录
-	CachePath = "data/cache"
+	// ImagePath go-cqhttp-Serverless使用的图片缓存目录
+	ImagePath = "tmp/data/images"
+	// ImagePathOld 兼容旧版go-cqhttp-Serverless使用的图片缓存目录
+	ImagePathOld = "tmp/data/image"
+	// VoicePath go-cqhttp-Serverless使用的语音缓存目录
+	VoicePath = "tmp/data/voices"
+	// VoicePathOld 兼容旧版go-cqhttp-Serverless使用的语音缓存目录
+	VoicePathOld = "tmp/data/record"
+	// VideoPath go-cqhttp-Serverless使用的视频缓存目录
+	VideoPath = "tmp/data/videos"
+	// CachePath go-cqhttp-Serverless使用的缓存目录
+	CachePath = "tmp/data/cache"
 )
 
 var (
