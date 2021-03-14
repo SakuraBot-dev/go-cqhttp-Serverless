@@ -7,3 +7,6 @@ data/
 logs/
 tmp/
 *.exe
+gocq
+*.zip
+*.http

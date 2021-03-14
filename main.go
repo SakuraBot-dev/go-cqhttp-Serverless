@@ -23,6 +23,7 @@ import (
 	"github.com/Mrs4s/go-cqhttp/global/terminal"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
+	"github.com/tencentyun/scf-go-lib/cloudfunction"
 
 	"github.com/Mrs4s/go-cqhttp/server"
 	"golang.org/x/crypto/pbkdf2"
@@ -52,7 +53,7 @@ func init() {
 		TimestampFormat: "2006-01-02 15:04:05",
 		LogFormat:       "[%time%] [%lvl%]: %msg% \n",
 	}
-	w, err := rotatelogs.New(path.Join("tmp/logs", "%Y-%m-%d.log"), rotatelogs.WithRotationTime(time.Hour*24))
+	w, err := rotatelogs.New(path.Join("/mnt/logs", "%Y-%m-%d.log"), rotatelogs.WithRotationTime(time.Hour*24))
 	if err != nil {
 		log.Errorf("rotatelogs init err: %v", err)
 		panic(err)
@@ -123,6 +124,7 @@ func init() {
 }
 
 func main() {
+	go cloudfunction.Start(server.SCFHandler)
 	if h {
 		help()
 	}
@@ -151,9 +153,9 @@ func main() {
 	}
 	if conf.Uin == 0 || (conf.Password == "" && conf.PasswordEncrypted == "") {
 		log.Warnf("请修改 config.hjson 以添加账号密码.")
-		if !isFastStart {
-			time.Sleep(time.Second * 5)
-		}
+		// if !isFastStart {
+		// 	time.Sleep(time.Second * 5)
+		// }
 		return
 	}
 
@@ -226,10 +228,10 @@ func main() {
 	} else {
 		global.PasswordHash = md5.Sum([]byte(conf.Password))
 	}
-	if !isFastStart {
-		log.Info("Bot将在5秒后登录并开始信息处理, 按 Ctrl+C 取消.")
-		time.Sleep(time.Second * 5)
-	}
+	// if !isFastStart {
+	// 	log.Info("Bot将在5秒后登录并开始信息处理, 按 Ctrl+C 取消.")
+	// 	time.Sleep(time.Second * 5)
+	// }
 	log.Info("开始尝试登录并同步消息...")
 	log.Infof("使用协议: %v", func() string {
 		switch client.SystemDeviceInfo.Protocol {
@@ -286,7 +288,8 @@ func main() {
 		conf.WebUI.Host = "127.0.0.1"
 	}
 	global.Proxy = conf.ProxyRewrite
-	b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
+	// b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
+	b := server.SCFEntry.Run(cli)
 	c := server.Console
 	r := server.Restart
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
