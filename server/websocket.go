@@ -64,7 +64,7 @@ func (s *webSocketServer) Run(addr, authToken string, b *coolq.CQBot) {
 	}()
 }
 
-// NewWebSocketClient 初始化一个NWebSocket客户端
+// NewWebSocketClient 初始化一个WebSocket客户端
 func NewWebSocketClient(conf *global.GoCQReverseWebSocketConfig, authToken string, b *coolq.CQBot) *WebSocketClient {
 	return &WebSocketClient{conf: conf, token: authToken, bot: b}
 }
