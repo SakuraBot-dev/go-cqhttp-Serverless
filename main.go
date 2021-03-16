@@ -20,21 +20,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Mrs4s/go-cqhttp/coolq"
+	"github.com/Mrs4s/go-cqhttp/global"
 	"github.com/Mrs4s/go-cqhttp/global/terminal"
-	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"github.com/tencentyun/scf-go-lib/cloudfunction"
 
 	"github.com/Mrs4s/go-cqhttp/server"
-	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/term"
 
 	"github.com/Mrs4s/MiraiGo/binary"
 	"github.com/Mrs4s/MiraiGo/client"
-	"github.com/Mrs4s/go-cqhttp/coolq"
-	"github.com/Mrs4s/go-cqhttp/global"
 	jsoniter "github.com/json-iterator/go"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	log "github.com/sirupsen/logrus"
+	easy "github.com/t-tomalak/logrus-easy-formatter"
+	"golang.org/x/crypto/pbkdf2"
+	"golang.org/x/term"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -44,7 +44,6 @@ var d bool
 var h bool
 
 func init() {
-
 	flag.BoolVar(&d, "d", false, "running as a daemon")
 	flag.BoolVar(&h, "h", false, "this help")
 	flag.Parse()
@@ -353,10 +352,10 @@ func OldPasswordDecrypt(encryptedPassword string, key []byte) string {
 	return string(tea.Decrypt(encrypted))
 }
 
-func restart(Args []string) {
+func restart(args []string) {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		file, err := exec.LookPath(Args[0])
+		file, err := exec.LookPath(args[0])
 		if err != nil {
 			log.Errorf("重启失败:%s", err.Error())
 			return
@@ -365,18 +364,18 @@ func restart(Args []string) {
 		if err != nil {
 			log.Errorf("重启失败:%s", err.Error())
 		}
-		Args = append([]string{"/c", "start ", path, "faststart"}, Args[1:]...)
+		args = append([]string{"/c", "start ", path, "faststart"}, args[1:]...)
 		cmd = &exec.Cmd{
 			Path:   "cmd.exe",
-			Args:   Args,
+			Args:   args,
 			Stderr: os.Stderr,
 			Stdout: os.Stdout,
 		}
 	} else {
-		Args = append(Args, "faststart")
+		args = append(args, "faststart")
 		cmd = &exec.Cmd{
-			Path:   Args[0],
-			Args:   Args,
+			Path:   args[0],
+			Args:   args,
 			Stderr: os.Stderr,
 			Stdout: os.Stdout,
 		}
@@ -386,11 +385,12 @@ func restart(Args []string) {
 
 func getConfig() *global.JSONConfig {
 	var conf *global.JSONConfig
-	if global.PathExists("config.json") {
+	switch {
+	case global.PathExists("config.json"):
 		conf = global.LoadConfig("config.json")
 		_ = conf.Save("config.hjson")
 		_ = os.Remove("config.json")
-	} else if os.Getenv("UIN") != "" {
+	case os.Getenv("UIN") != "":
 		log.Infof("将从环境变量加载配置.")
 		uin, _ := strconv.ParseInt(os.Getenv("UIN"), 10, 64)
 		pwd := os.Getenv("PASS")
@@ -415,7 +415,7 @@ func getConfig() *global.JSONConfig {
 		if post != "" {
 			conf.HTTPConfig.PostUrls[post] = os.Getenv("HTTP_SECRET")
 		}
-	} else {
+	default:
 		conf = global.LoadConfig("config.hjson")
 	}
 	if conf == nil {
