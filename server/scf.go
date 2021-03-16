@@ -5,11 +5,12 @@ import (
 	"strings"
 
 	"github.com/Mrs4s/MiraiGo/client"
-	"github.com/Mrs4s/go-cqhttp/coolq"
 	log "github.com/sirupsen/logrus"
 	"github.com/tencentyun/scf-go-lib/events"
 	"github.com/tencentyun/scf-go-lib/functioncontext"
 	"github.com/tidwall/gjson"
+
+	"github.com/Mrs4s/go-cqhttp/coolq"
 )
 
 // SCFEvent 云函数Event结构体
@@ -71,7 +72,7 @@ func (s *scfEntry) UpServer(b *coolq.CQBot) {
 // SCFHandler 云函数回调
 func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayReponse, err error) {
 	lc, _ := functioncontext.FromContext(ctx)
-	var res = coolq.MSG{}
+	res := coolq.MSG{}
 	if !IsUp {
 		log.Debugf("go-cqhttp-Serverless接收到Api调用，正在启动中")
 		res = coolq.OK(coolq.MSG{
@@ -107,7 +108,7 @@ func (e SCFEvent) Get(k string) gjson.Result {
 			return gjson.Result{Type: gjson.String, Str: e.Body}
 		}
 		if strings.Contains(e.ContentType, "application/json") {
-			return gjson.Get(strings.Replace(e.Body, "\\", "", -1), k)
+			return gjson.Get(strings.ReplaceAll(e.Body, "\\", ""), k)
 		}
 	}
 	return gjson.Result{Type: gjson.Null, Str: ""}

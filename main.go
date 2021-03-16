@@ -23,25 +23,27 @@ import (
 	"github.com/Mrs4s/go-cqhttp/coolq"
 	"github.com/Mrs4s/go-cqhttp/global"
 	"github.com/Mrs4s/go-cqhttp/global/terminal"
-	"github.com/tencentyun/scf-go-lib/cloudfunction"
-
 	"github.com/Mrs4s/go-cqhttp/server"
 
 	"github.com/Mrs4s/MiraiGo/binary"
 	"github.com/Mrs4s/MiraiGo/client"
+
 	jsoniter "github.com/json-iterator/go"
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 	log "github.com/sirupsen/logrus"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
+	"github.com/tencentyun/scf-go-lib/cloudfunction"
 	"golang.org/x/crypto/pbkdf2"
 	"golang.org/x/term"
 )
 
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
-var conf *global.JSONConfig
-var isFastStart = false
-var d bool
-var h bool
+var (
+	json        = jsoniter.ConfigCompatibleWithStandardLibrary
+	conf        *global.JSONConfig
+	isFastStart = false
+	d           bool
+	h           bool
+)
 
 func init() {
 	flag.BoolVar(&d, "d", false, "running as a daemon")
