@@ -20,13 +20,13 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-type webSocketServer struct {
-	bot            *coolq.CQBot
-	token          string
-	eventConn      []*webSocketConn
-	eventConnMutex sync.Mutex
-	handshake      string
-}
+// type webSocketServer struct {
+// 	bot            *coolq.CQBot
+// 	token          string
+// 	eventConn      []*webSocketConn
+// 	eventConnMutex sync.Mutex
+// 	handshake      string
+// }
 
 // WebSocketClient WebSocket客户端实例
 type WebSocketClient struct {
@@ -45,27 +45,27 @@ type webSocketConn struct {
 }
 
 // WebSocketServer 初始化一个WebSocketServer实例
-var WebSocketServer = &webSocketServer{}
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
-}
+// var WebSocketServer = &webSocketServer{}
+// var upgrader = websocket.Upgrader{
+// 	CheckOrigin: func(r *http.Request) bool {
+// 		return true
+// 	},
+// }
 
-func (s *webSocketServer) Run(addr, authToken string, b *coolq.CQBot) {
-	s.token = authToken
-	s.bot = b
-	s.handshake = fmt.Sprintf(`{"_post_method":2,"meta_event_type":"lifecycle","post_type":"meta_event","self_id":%d,"sub_type":"connect","time":%d}`,
-		s.bot.Client.Uin, time.Now().Unix())
-	b.OnEventPush(s.onBotPushEvent)
-	http.HandleFunc("/event", s.event)
-	http.HandleFunc("/api", s.api)
-	http.HandleFunc("/", s.any)
-	go func() {
-		log.Infof("CQ WebSocket 服务器已启动: %v", addr)
-		log.Fatal(http.ListenAndServe(addr, nil))
-	}()
-}
+// func (s *webSocketServer) Run(addr, authToken string, b *coolq.CQBot) {
+// 	s.token = authToken
+// 	s.bot = b
+// 	s.handshake = fmt.Sprintf(`{"_post_method":2,"meta_event_type":"lifecycle","post_type":"meta_event","self_id":%d,"sub_type":"connect","time":%d}`,
+// 		s.bot.Client.Uin, time.Now().Unix())
+// 	b.OnEventPush(s.onBotPushEvent)
+// 	http.HandleFunc("/event", s.event)
+// 	http.HandleFunc("/api", s.api)
+// 	http.HandleFunc("/", s.any)
+// 	go func() {
+// 		log.Infof("CQ WebSocket 服务器已启动: %v", addr)
+// 		log.Fatal(http.ListenAndServe(addr, nil))
+// 	}()
+// }
 
 // NewWebSocketClient 初始化一个WebSocket客户端
 func NewWebSocketClient(conf *global.GoCQReverseWebSocketConfig, authToken string, b *coolq.CQBot) *WebSocketClient {
@@ -228,97 +228,93 @@ func (c *WebSocketClient) onBotPushEvent(m *bytes.Buffer) {
 	}
 }
 
-func (s *webSocketServer) event(w http.ResponseWriter, r *http.Request) {
-	if s.token != "" {
-		if auth := r.URL.Query().Get("access_token"); auth != s.token {
-			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
-				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
-				w.WriteHeader(401)
-				return
-			}
-		}
-	}
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
-		return
-	}
-	err = c.WriteMessage(websocket.TextMessage, []byte(s.handshake))
-	if err != nil {
-		log.Warnf("WebSocket 握手时出现错误: %v", err)
-		c.Close()
-		return
-	}
+// func (s *webSocketServer) event(w http.ResponseWriter, r *http.Request) {
+// 	if s.token != "" {
+// 		if auth := r.URL.Query().Get("access_token"); auth != s.token {
+// 			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
+// 				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
+// 				w.WriteHeader(401)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	c, err := upgrader.Upgrade(w, r, nil)
+// 	if err != nil {
+// 		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
+// 		return
+// 	}
+// 	err = c.WriteMessage(websocket.TextMessage, []byte(s.handshake))
+// 	if err != nil {
+// 		log.Warnf("WebSocket 握手时出现错误: %v", err)
+// 		c.Close()
+// 		return
+// 	}
+// 	log.Infof("接受 WebSocket 连接: %v (/event)", r.RemoteAddr)
+// 	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
+// 	s.eventConnMutex.Lock()
+// 	s.eventConn = append(s.eventConn, conn)
+// 	s.eventConnMutex.Unlock()
+// }
 
-	log.Infof("接受 WebSocket 连接: %v (/event)", r.RemoteAddr)
+// func (s *webSocketServer) api(w http.ResponseWriter, r *http.Request) {
+// 	if s.token != "" {
+// 		if auth := r.URL.Query().Get("access_token"); auth != s.token {
+// 			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
+// 				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
+// 				w.WriteHeader(401)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	c, err := upgrader.Upgrade(w, r, nil)
+// 	if err != nil {
+// 		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
+// 		return
+// 	}
+// 	log.Infof("接受 WebSocket 连接: %v (/api)", r.RemoteAddr)
+// 	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
+// 	go s.listenAPI(conn)
+// }
 
-	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
+// func (s *webSocketServer) any(w http.ResponseWriter, r *http.Request) {
+// 	if s.token != "" {
+// 		if auth := r.URL.Query().Get("access_token"); auth != s.token {
+// 			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
+// 				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
+// 				w.WriteHeader(401)
+// 				return
+// 			}
+// 		}
+// 	}
+// 	c, err := upgrader.Upgrade(w, r, nil)
+// 	if err != nil {
+// 		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
+// 		return
+// 	}
+// 	err = c.WriteMessage(websocket.TextMessage, []byte(s.handshake))
+// 	if err != nil {
+// 		log.Warnf("WebSocket 握手时出现错误: %v", err)
+// 		c.Close()
+// 		return
+// 	}
+// 	log.Infof("接受 WebSocket 连接: %v (/)", r.RemoteAddr)
+// 	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
+// 	s.eventConn = append(s.eventConn, conn)
+// 	s.listenAPI(conn)
+// }
 
-	s.eventConnMutex.Lock()
-	s.eventConn = append(s.eventConn, conn)
-	s.eventConnMutex.Unlock()
-}
-
-func (s *webSocketServer) api(w http.ResponseWriter, r *http.Request) {
-	if s.token != "" {
-		if auth := r.URL.Query().Get("access_token"); auth != s.token {
-			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
-				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
-				w.WriteHeader(401)
-				return
-			}
-		}
-	}
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
-		return
-	}
-	log.Infof("接受 WebSocket 连接: %v (/api)", r.RemoteAddr)
-	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
-	go s.listenAPI(conn)
-}
-
-func (s *webSocketServer) any(w http.ResponseWriter, r *http.Request) {
-	if s.token != "" {
-		if auth := r.URL.Query().Get("access_token"); auth != s.token {
-			if auth := strings.SplitN(r.Header.Get("Authorization"), " ", 2); len(auth) != 2 || auth[1] != s.token {
-				log.Warnf("已拒绝 %v 的 WebSocket 请求: Token鉴权失败", r.RemoteAddr)
-				w.WriteHeader(401)
-				return
-			}
-		}
-	}
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Warnf("处理 WebSocket 请求时出现错误: %v", err)
-		return
-	}
-	err = c.WriteMessage(websocket.TextMessage, []byte(s.handshake))
-	if err != nil {
-		log.Warnf("WebSocket 握手时出现错误: %v", err)
-		c.Close()
-		return
-	}
-	log.Infof("接受 WebSocket 连接: %v (/)", r.RemoteAddr)
-	conn := &webSocketConn{Conn: c, apiCaller: apiCaller{s.bot}}
-	s.eventConn = append(s.eventConn, conn)
-	s.listenAPI(conn)
-}
-
-func (s *webSocketServer) listenAPI(c *webSocketConn) {
-	defer c.Close()
-	for {
-		t, payload, err := c.ReadMessage()
-		if err != nil {
-			break
-		}
-
-		if t == websocket.TextMessage {
-			go c.handleRequest(s.bot, payload)
-		}
-	}
-}
+// func (s *webSocketServer) listenAPI(c *webSocketConn) {
+// 	defer c.Close()
+// 	for {
+// 		t, payload, err := c.ReadMessage()
+// 		if err != nil {
+// 			break
+// 		}
+// 		if t == websocket.TextMessage {
+// 			go c.handleRequest(s.bot, payload)
+// 		}
+// 	}
+// }
 
 func (c *webSocketConn) handleRequest(_ *coolq.CQBot, payload []byte) {
 	defer func() {
@@ -340,26 +336,26 @@ func (c *webSocketConn) handleRequest(_ *coolq.CQBot, payload []byte) {
 	_ = c.WriteJSON(ret)
 }
 
-func (s *webSocketServer) onBotPushEvent(m *bytes.Buffer) {
-	s.eventConnMutex.Lock()
-	defer s.eventConnMutex.Unlock()
-	for i, l := 0, len(s.eventConn); i < l; i++ {
-		conn := s.eventConn[i]
-		log.Debugf("向WS客户端 %v 推送Event: %v", conn.RemoteAddr().String(), utils.B2S(m.Bytes()))
-		conn.Lock()
-		if err := conn.WriteMessage(websocket.TextMessage, m.Bytes()); err != nil {
-			_ = conn.Close()
-			next := i + 1
-			if next >= l {
-				next = l - 1
-			}
-			s.eventConn[i], s.eventConn[next] = s.eventConn[next], s.eventConn[i]
-			s.eventConn = append(s.eventConn[:next], s.eventConn[next+1:]...)
-			i--
-			l--
-			conn = nil
-			continue
-		}
-		conn.Unlock()
-	}
-}
+// func (s *webSocketServer) onBotPushEvent(m *bytes.Buffer) {
+// 	s.eventConnMutex.Lock()
+// 	defer s.eventConnMutex.Unlock()
+// 	for i, l := 0, len(s.eventConn); i < l; i++ {
+// 		conn := s.eventConn[i]
+// 		log.Debugf("向WS客户端 %v 推送Event: %v", conn.RemoteAddr().String(), utils.B2S(m.Bytes()))
+// 		conn.Lock()
+// 		if err := conn.WriteMessage(websocket.TextMessage, m.Bytes()); err != nil {
+// 			_ = conn.Close()
+// 			next := i + 1
+// 			if next >= l {
+// 				next = l - 1
+// 			}
+// 			s.eventConn[i], s.eventConn[next] = s.eventConn[next], s.eventConn[i]
+// 			s.eventConn = append(s.eventConn[:next], s.eventConn[next+1:]...)
+// 			i--
+// 			l--
+// 			conn = nil
+// 			continue
+// 		}
+// 		conn.Unlock()
+// 	}
+// }

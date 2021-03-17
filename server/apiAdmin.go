@@ -3,16 +3,11 @@ package server
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"image"
 	"io/ioutil"
-	"net/http"
 	"os"
-	"os/signal"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Mrs4s/go-cqhttp/coolq"
@@ -20,11 +15,9 @@ import (
 
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/utils"
-	"github.com/gin-contrib/pprof"
-	"github.com/gin-gonic/gin"
+
 	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
-	"github.com/tidwall/gjson"
 	asciiart "github.com/yinghau76/go-ascii-art"
 )
 
@@ -43,79 +36,79 @@ var Restart = make(chan struct{}, 1)
 var JSONConfig *global.JSONConfig
 
 type webServer struct {
-	engine  *gin.Engine
+	// engine  *gin.Engine
 	bot     *coolq.CQBot
 	Cli     *client.QQClient
 	Conf    *global.JSONConfig // old config
 	Console *bufio.Reader
 }
 
-// WebServer Admin子站的Server
-var WebServer = &webServer{}
+// // WebServer Admin子站的Server
+// var WebServer = &webServer{}
 
-// APIAdminRoutingTable Admin子站的路由映射
-var APIAdminRoutingTable = map[string]func(s *webServer, c *gin.Context){
-	"do_restart":         AdminDoRestart,         // 热重启
-	"do_process_restart": AdminProcessRestart,    // 进程重启
-	"get_web_write":      AdminWebWrite,          // 获取是否验证码输入
-	"do_web_write":       AdminDoWebWrite,        // web上进行输入操作
-	"do_restart_docker":  AdminDoRestartDocker,   // 直接停止（依赖supervisord/docker）重新拉起
-	"do_config_base":     AdminDoConfigBase,      // 修改config.json中的基础部分
-	"do_config_http":     AdminDoConfigHTTP,      // 修改config.json的http部分
-	"do_config_ws":       AdminDoConfigWS,        // 修改config.json的正向ws部分
-	"do_config_reverse":  AdminDoConfigReverseWS, // 修改config.json 中的反向ws部分
-	"do_config_json":     AdminDoConfigJSON,      // 直接修改 config.json配置
-	"get_config_json":    AdminGetConfigJSON,     // 拉取 当前的config.json配置
-}
+// // APIAdminRoutingTable Admin子站的路由映射
+// // var APIAdminRoutingTable = map[string]func(s *webServer, c *gin.Context){
+// // 	"do_restart":         AdminDoRestart,         // 热重启
+// // 	"do_process_restart": AdminProcessRestart,    // 进程重启
+// // 	"get_web_write":      AdminWebWrite,          // 获取是否验证码输入
+// // 	"do_web_write":       AdminDoWebWrite,        // web上进行输入操作
+// // 	"do_restart_docker":  AdminDoRestartDocker,   // 直接停止（依赖supervisord/docker）重新拉起
+// // 	"do_config_base":     AdminDoConfigBase,      // 修改config.json中的基础部分
+// // 	"do_config_http":     AdminDoConfigHTTP,      // 修改config.json的http部分
+// // 	"do_config_ws":       AdminDoConfigWS,        // 修改config.json的正向ws部分
+// // 	"do_config_reverse":  AdminDoConfigReverseWS, // 修改config.json 中的反向ws部分
+// // 	"do_config_json":     AdminDoConfigJSON,      // 直接修改 config.json配置
+// // 	"get_config_json":    AdminGetConfigJSON,     // 拉取 当前的config.json配置
+// // }
 
-// Failed 构建失败返回MSG
-func Failed(code int, msg string) coolq.MSG {
-	return coolq.MSG{"data": nil, "retcode": code, "status": "failed", "msg": msg}
-}
+// // Failed 构建失败返回MSG
+// func Failed(code int, msg string) coolq.MSG {
+// 	return coolq.MSG{"data": nil, "retcode": code, "status": "failed", "msg": msg}
+// }
 
-func (s *webServer) Run(addr string, cli *client.QQClient) *coolq.CQBot {
-	s.Cli = cli
-	s.Conf = GetConf()
-	JSONConfig = s.Conf
-	gin.SetMode(gin.ReleaseMode)
-	s.engine = gin.New()
+// // func (s *webServer) Run(addr string, cli *client.QQClient) *coolq.CQBot {
+// // 	s.Cli = cli
+// // 	s.Conf = GetConf()
+// // 	JSONConfig = s.Conf
+// // 	gin.SetMode(gin.ReleaseMode)
+// // 	s.engine = gin.New()
 
-	s.engine.Use(AuthMiddleWare())
+// // 	s.engine.Use(AuthMiddleWare())
 
-	// 通用路由
-	s.engine.Any("/admin/:action", s.admin)
+// // 	// 通用路由
+// // 	s.engine.Any("/admin/:action", s.admin)
 
-	go func() {
-		// 开启端口监听
-		if s.Conf.WebUI != nil && s.Conf.WebUI.Enabled {
-			if Debug {
-				pprof.Register(s.engine)
-				log.Debugf("pprof 性能分析服务已启动在 http://%v/debug/pprof, 如果有任何性能问题请下载报告并提交给开发者", addr)
-				time.Sleep(time.Second * 3)
-			}
-			log.Infof("Admin API 服务器已启动: %v", addr)
-			err := s.engine.Run(addr)
-			if err != nil {
-				log.Error(err)
-				log.Infof("请检查端口是否被占用.")
-				c := make(chan os.Signal, 1)
-				signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-				<-c
-				os.Exit(1)
-			}
-		} else {
-			// 关闭端口监听
-			c := make(chan os.Signal, 1)
-			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-			<-c
-			os.Exit(1)
-		}
-	}()
-	s.Dologin()
-	s.UpServer()
-	b := s.bot // 外部引入 bot对象，用于操作bot
-	return b
-}
+// // 	go func() {
+// // 		// 开启端口监听
+// // 		if s.Conf.WebUI != nil && s.Conf.WebUI.Enabled {
+// // 			if Debug {
+// // 				pprof.Register(s.engine)
+// // 				log.Debugf("pprof 性能分析服务已启动在 http://%v/debug/pprof, 如果有任何性能问题请下载报告并提交给开发者", addr)
+// // 				time.Sleep(time.Second * 3)
+// // 			}
+// // 			log.Infof("Admin API 服务器已启动: %v", addr)
+// // 			err := s.engine.Run(addr)
+// // 			if err != nil {
+// // 				log.Error(err)
+// // 				log.Infof("请检查端口是否被占用.")
+// // 				c := make(chan os.Signal, 1)
+// // 				signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+// // 				<-c
+// // 				os.Exit(1)
+// // 			}
+// // 		} else {
+// // 			// 关闭端口监听
+// // 			c := make(chan os.Signal, 1)
+// // 			signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+// // 			<-c
+// // 			os.Exit(1)
+// // 		}
+// // 	}()
+// // 	s.Dologin()
+// // 	// s.UpServer()
+// // 	b := s.bot // 外部引入 bot对象，用于操作bot
+// // 	return b
+// // }
 
 // logincore 登录核心实现
 func (s *webServer) logincore(relogin bool) {
@@ -346,15 +339,15 @@ func (s *webServer) Dologin() {
 	})
 }
 
-func (s *webServer) admin(c *gin.Context) {
-	action := c.Param("action")
-	log.Debugf("WebServer接收到cgi调用: %v", action)
-	if f, ok := APIAdminRoutingTable[action]; ok {
-		f(s, c)
-	} else {
-		c.JSON(200, coolq.Failed(404))
-	}
-}
+// // func (s *webServer) admin(c *gin.Context) {
+// // 	action := c.Param("action")
+// // 	log.Debugf("WebServer接收到cgi调用: %v", action)
+// // 	if f, ok := APIAdminRoutingTable[action]; ok {
+// // 		f(s, c)
+// // 	} else {
+// // 		c.JSON(200, coolq.Failed(404))
+// // 	}
+// // }
 
 // GetConf 获取当前配置文件信息
 func GetConf() *global.JSONConfig {
@@ -365,297 +358,297 @@ func GetConf() *global.JSONConfig {
 	return conf
 }
 
-// AuthMiddleWare Admin控制器登录验证
-func AuthMiddleWare() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		conf := GetConf()
-		// 处理跨域问题
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Headers", "Content-Type,AccessToken,X-CSRF-Token, Authorization, Token")
-		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, PATCH, DELETE")
-		c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
-		c.Header("Access-Control-Allow-Credentials", "true")
-		// 放行所有OPTIONS方法，因为有的模板是要请求两次的
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-		}
-		if strings.Contains(c.Request.URL.Path, "debug") {
-			c.Next()
-			return
-		}
-		// 处理请求
-		if c.Request.Method != "GET" && c.Request.Method != "POST" {
-			log.Warnf("已拒绝客户端 %v 的请求: 方法错误", c.Request.RemoteAddr)
-			c.Status(404)
-			c.Abort()
-		}
-		if c.Request.Method == "POST" && strings.Contains(c.Request.Header.Get("Content-Type"), "application/json") {
-			d, err := c.GetRawData()
-			if err != nil {
-				log.Warnf("获取请求 %v 的Body时出现错误: %v", c.Request.RequestURI, err)
-				c.Status(400)
-				c.Abort()
-			}
-			if !gjson.ValidBytes(d) {
-				log.Warnf("已拒绝客户端 %v 的请求: 非法Json", c.Request.RemoteAddr)
-				c.Status(400)
-				c.Abort()
-			}
-			c.Set("json_body", gjson.ParseBytes(d))
-		}
-		authToken := conf.AccessToken
-		auth := c.Request.Header.Get("Authorization")
-		switch {
-		case auth != "":
-			if strings.SplitN(auth, " ", 2)[1] != authToken {
-				c.AbortWithStatus(401)
-				return
-			}
-			c.Next()
-		case c.Query("access_token") != authToken:
-			c.AbortWithStatus(401)
-			return
-		default:
-			c.Next()
-		}
-	}
-}
+// // AuthMiddleWare Admin控制器登录验证
+// // func AuthMiddleWare() gin.HandlerFunc {
+// // 	return func(c *gin.Context) {
+// // 		conf := GetConf()
+// // 		// 处理跨域问题
+// // 		c.Header("Access-Control-Allow-Origin", "*")
+// // 		c.Header("Access-Control-Allow-Headers", "Content-Type,AccessToken,X-CSRF-Token, Authorization, Token")
+// // 		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, PATCH, DELETE")
+// // 		c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+// // 		c.Header("Access-Control-Allow-Credentials", "true")
+// // 		// 放行所有OPTIONS方法，因为有的模板是要请求两次的
+// // 		if c.Request.Method == "OPTIONS" {
+// // 			c.AbortWithStatus(http.StatusNoContent)
+// // 		}
+// // 		if strings.Contains(c.Request.URL.Path, "debug") {
+// // 			c.Next()
+// // 			return
+// // 		}
+// // 		// 处理请求
+// // 		if c.Request.Method != "GET" && c.Request.Method != "POST" {
+// // 			log.Warnf("已拒绝客户端 %v 的请求: 方法错误", c.Request.RemoteAddr)
+// // 			c.Status(404)
+// // 			c.Abort()
+// // 		}
+// // 		if c.Request.Method == "POST" && strings.Contains(c.Request.Header.Get("Content-Type"), "application/json") {
+// // 			d, err := c.GetRawData()
+// // 			if err != nil {
+// // 				log.Warnf("获取请求 %v 的Body时出现错误: %v", c.Request.RequestURI, err)
+// // 				c.Status(400)
+// // 				c.Abort()
+// // 			}
+// // 			if !gjson.ValidBytes(d) {
+// // 				log.Warnf("已拒绝客户端 %v 的请求: 非法Json", c.Request.RemoteAddr)
+// // 				c.Status(400)
+// // 				c.Abort()
+// // 			}
+// // 			c.Set("json_body", gjson.ParseBytes(d))
+// // 		}
+// // 		authToken := conf.AccessToken
+// // 		auth := c.Request.Header.Get("Authorization")
+// // 		switch {
+// // 		case auth != "":
+// // 			if strings.SplitN(auth, " ", 2)[1] != authToken {
+// // 				c.AbortWithStatus(401)
+// // 				return
+// // 			}
+// // 			c.Next()
+// // 		case c.Query("access_token") != authToken:
+// // 			c.AbortWithStatus(401)
+// // 			return
+// // 		default:
+// // 			c.Next()
+// // 		}
+// // 	}
+// // }
 
-func (s *webServer) DoReLogin() { // TODO: 协议层的 ReLogin
-	JSONConfig = nil
-	conf := GetConf()
-	OldConf := s.Conf
-	cli := client.NewClient(conf.Uin, conf.Password)
-	log.Info("开始尝试登录并同步消息...")
-	log.Infof("使用协议: %v", func() string {
-		switch client.SystemDeviceInfo.Protocol {
-		case client.IPad:
-			return "iPad"
-		case client.AndroidPhone:
-			return "Android Phone"
-		case client.AndroidWatch:
-			return "Android Watch"
-		case client.MacOS:
-			return "MacOS"
-		}
-		return "未知"
-	}())
-	cli.OnLog(func(c *client.QQClient, e *client.LogEvent) {
-		switch e.Type {
-		case "INFO":
-			log.Info("Protocol -> " + e.Message)
-		case "ERROR":
-			log.Error("Protocol -> " + e.Message)
-		case "DEBUG":
-			log.Debug("Protocol -> " + e.Message)
-		}
-	})
-	cli.OnServerUpdated(func(bot *client.QQClient, e *client.ServerUpdatedEvent) bool {
-		if !conf.UseSSOAddress {
-			log.Infof("收到服务器地址更新通知, 根据配置文件已忽略.")
-			return false
-		}
-		log.Infof("收到服务器地址更新通知, 将在下一次重连时应用. ")
-		return true
-	})
-	s.Cli = cli
-	s.Dologin()
-	// 关闭之前的 server
-	if OldConf.HTTPConfig != nil && OldConf.HTTPConfig.Enabled {
-		cqHTTPServer.ShutDown()
-	}
-	// if OldConf.WSConfig != nil && OldConf.WSConfig.Enabled {
-	// 	server.WsShutdown()
-	// }
-	// s.UpServer()
+// func (s *webServer) DoReLogin() { // TODO: 协议层的 ReLogin
+// 	JSONConfig = nil
+// 	conf := GetConf()
+// 	// OldConf := s.Conf
+// 	cli := client.NewClient(conf.Uin, conf.Password)
+// 	log.Info("开始尝试登录并同步消息...")
+// 	log.Infof("使用协议: %v", func() string {
+// 		switch client.SystemDeviceInfo.Protocol {
+// 		case client.IPad:
+// 			return "iPad"
+// 		case client.AndroidPhone:
+// 			return "Android Phone"
+// 		case client.AndroidWatch:
+// 			return "Android Watch"
+// 		case client.MacOS:
+// 			return "MacOS"
+// 		}
+// 		return "未知"
+// 	}())
+// 	cli.OnLog(func(c *client.QQClient, e *client.LogEvent) {
+// 		switch e.Type {
+// 		case "INFO":
+// 			log.Info("Protocol -> " + e.Message)
+// 		case "ERROR":
+// 			log.Error("Protocol -> " + e.Message)
+// 		case "DEBUG":
+// 			log.Debug("Protocol -> " + e.Message)
+// 		}
+// 	})
+// 	cli.OnServerUpdated(func(bot *client.QQClient, e *client.ServerUpdatedEvent) bool {
+// 		if !conf.UseSSOAddress {
+// 			log.Infof("收到服务器地址更新通知, 根据配置文件已忽略.")
+// 			return false
+// 		}
+// 		log.Infof("收到服务器地址更新通知, 将在下一次重连时应用. ")
+// 		return true
+// 	})
+// 	s.Cli = cli
+// 	s.Dologin()
+// 	// 关闭之前的 server
+// 	// if OldConf.HTTPConfig != nil && OldConf.HTTPConfig.Enabled {
+// 	// 	cqHTTPServer.ShutDown()
+// 	// }
+// 	// if OldConf.WSConfig != nil && OldConf.WSConfig.Enabled {
+// 	// 	server.WsShutdown()
+// 	// }
+// 	// s.UpServer()
 
-	s.ReloadServer()
-	s.Conf = conf
-}
+// 	s.ReloadServer()
+// 	s.Conf = conf
+// }
 
-func (s *webServer) UpServer() {
-	conf := GetConf()
-	if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
-		go cqHTTPServer.Run(fmt.Sprintf("%s:%d", conf.HTTPConfig.Host, conf.HTTPConfig.Port), conf.AccessToken, s.bot)
-		for k, v := range conf.HTTPConfig.PostUrls {
-			newHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, s.bot)
-		}
-	}
-	if conf.WSConfig != nil && conf.WSConfig.Enabled {
-		go WebSocketServer.Run(fmt.Sprintf("%s:%d", conf.WSConfig.Host, conf.WSConfig.Port), conf.AccessToken, s.bot)
-	}
-	for _, rc := range conf.ReverseServers {
-		go NewWebSocketClient(rc, conf.AccessToken, s.bot).Run()
-	}
-}
+// func (s *webServer) UpServer() {
+// 	conf := GetConf()
+// 	if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
+// 		// go cqHTTPServer.Run(fmt.Sprintf("%s:%d", conf.HTTPConfig.Host, conf.HTTPConfig.Port), conf.AccessToken, s.bot)
+// 		for k, v := range conf.HTTPConfig.PostUrls {
+// 			newHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, s.bot)
+// 		}
+// 	}
+// 	if conf.WSConfig != nil && conf.WSConfig.Enabled {
+// 		go WebSocketServer.Run(fmt.Sprintf("%s:%d", conf.WSConfig.Host, conf.WSConfig.Port), conf.AccessToken, s.bot)
+// 	}
+// 	for _, rc := range conf.ReverseServers {
+// 		go NewWebSocketClient(rc, conf.AccessToken, s.bot).Run()
+// 	}
+// }
 
-// 暂不支持ws服务的重启
-func (s *webServer) ReloadServer() {
-	conf := GetConf()
-	if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
-		go cqHTTPServer.Run(fmt.Sprintf("%s:%d", conf.HTTPConfig.Host, conf.HTTPConfig.Port), conf.AccessToken, s.bot)
-		for k, v := range conf.HTTPConfig.PostUrls {
-			newHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, s.bot)
-		}
-	}
-	for _, rc := range conf.ReverseServers {
-		go NewWebSocketClient(rc, conf.AccessToken, s.bot).Run()
-	}
-}
+// // 暂不支持ws服务的重启
+// func (s *webServer) ReloadServer() {
+// 	conf := GetConf()
+// 	if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
+// 		// go cqHTTPServer.Run(fmt.Sprintf("%s:%d", conf.HTTPConfig.Host, conf.HTTPConfig.Port), conf.AccessToken, s.bot)
+// 		for k, v := range conf.HTTPConfig.PostUrls {
+// 			newHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, s.bot)
+// 		}
+// 	}
+// 	for _, rc := range conf.ReverseServers {
+// 		go NewWebSocketClient(rc, conf.AccessToken, s.bot).Run()
+// 	}
+// }
 
-// AdminDoRestart 热重启
-func AdminDoRestart(s *webServer, c *gin.Context) {
-	s.bot.Release()
-	s.bot = nil
-	s.Cli = nil
-	s.DoReLogin()
-	c.JSON(200, coolq.OK(coolq.MSG{}))
-}
+// // AdminDoRestart 热重启
+// func AdminDoRestart(s *webServer, c *gin.Context) {
+// 	s.bot.Release()
+// 	s.bot = nil
+// 	s.Cli = nil
+// 	s.DoReLogin()
+// 	c.JSON(200, coolq.OK(coolq.MSG{}))
+// }
 
-// AdminProcessRestart 进程重启
-func AdminProcessRestart(s *webServer, c *gin.Context) {
-	Restart <- struct{}{}
-	c.JSON(200, coolq.OK(coolq.MSG{}))
-}
+// // AdminProcessRestart 进程重启
+// func AdminProcessRestart(s *webServer, c *gin.Context) {
+// 	Restart <- struct{}{}
+// 	c.JSON(200, coolq.OK(coolq.MSG{}))
+// }
 
-// AdminDoRestartDocker 冷重启
-func AdminDoRestartDocker(s *webServer, c *gin.Context) {
-	Console <- os.Kill
-	c.JSON(200, coolq.OK(coolq.MSG{}))
-}
+// // AdminDoRestartDocker 冷重启
+// func AdminDoRestartDocker(s *webServer, c *gin.Context) {
+// 	Console <- os.Kill
+// 	c.JSON(200, coolq.OK(coolq.MSG{}))
+// }
 
-// AdminWebWrite web输入html页面
-func AdminWebWrite(s *webServer, c *gin.Context) {
-	pic := global.ReadAllText("captcha.jpg")
-	var picbase64 string
-	var ispic = false
-	if pic != "" {
-		input := []byte(pic)
-		// base64编码
-		picbase64 = base64.StdEncoding.EncodeToString(input)
-		ispic = true
-	}
-	c.JSON(200, coolq.OK(coolq.MSG{
-		"ispic":     ispic,     // 为空则为 设备锁 或者没有需要输入
-		"picbase64": picbase64, // web上显示图片
-	}))
-}
+// // AdminWebWrite web输入html页面
+// func AdminWebWrite(s *webServer, c *gin.Context) {
+// 	pic := global.ReadAllText("captcha.jpg")
+// 	var picbase64 string
+// 	var ispic = false
+// 	if pic != "" {
+// 		input := []byte(pic)
+// 		// base64编码
+// 		picbase64 = base64.StdEncoding.EncodeToString(input)
+// 		ispic = true
+// 	}
+// 	c.JSON(200, coolq.OK(coolq.MSG{
+// 		"ispic":     ispic,     // 为空则为 设备锁 或者没有需要输入
+// 		"picbase64": picbase64, // web上显示图片
+// 	}))
+// }
 
-// AdminDoWebWrite web输入处理
-func AdminDoWebWrite(s *webServer, c *gin.Context) {
-	input := c.PostForm("input")
-	WebInput <- input
-	c.JSON(200, coolq.OK(coolq.MSG{}))
-}
+// // AdminDoWebWrite web输入处理
+// func AdminDoWebWrite(s *webServer, c *gin.Context) {
+// 	input := c.PostForm("input")
+// 	WebInput <- input
+// 	c.JSON(200, coolq.OK(coolq.MSG{}))
+// }
 
-// AdminDoConfigBase 普通配置修改
-func AdminDoConfigBase(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	conf.Uin, _ = strconv.ParseInt(c.PostForm("uin"), 10, 64)
-	conf.Password = c.PostForm("password")
-	if c.PostForm("enable_db") == "true" {
-		conf.EnableDB = true
-	} else {
-		conf.EnableDB = false
-	}
-	conf.AccessToken = c.PostForm("access_token")
-	if err := conf.Save(global.DefaultConfFile); err != nil {
-		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-	} else {
-		JSONConfig = nil
-		c.JSON(200, coolq.OK(coolq.MSG{}))
-	}
-}
+// // AdminDoConfigBase 普通配置修改
+// func AdminDoConfigBase(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	conf.Uin, _ = strconv.ParseInt(c.PostForm("uin"), 10, 64)
+// 	conf.Password = c.PostForm("password")
+// 	if c.PostForm("enable_db") == "true" {
+// 		conf.EnableDB = true
+// 	} else {
+// 		conf.EnableDB = false
+// 	}
+// 	conf.AccessToken = c.PostForm("access_token")
+// 	if err := conf.Save(global.DefaultConfFile); err != nil {
+// 		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 	} else {
+// 		JSONConfig = nil
+// 		c.JSON(200, coolq.OK(coolq.MSG{}))
+// 	}
+// }
 
-// AdminDoConfigHTTP HTTP配置修改
-func AdminDoConfigHTTP(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	p, _ := strconv.ParseUint(c.PostForm("port"), 10, 16)
-	conf.HTTPConfig.Port = uint16(p)
-	conf.HTTPConfig.Host = c.PostForm("host")
-	if c.PostForm("enable") == "true" {
-		conf.HTTPConfig.Enabled = true
-	} else {
-		conf.HTTPConfig.Enabled = false
-	}
-	t, _ := strconv.ParseInt(c.PostForm("timeout"), 10, 32)
-	conf.HTTPConfig.Timeout = int32(t)
-	if c.PostForm("post_url") != "" {
-		conf.HTTPConfig.PostUrls[c.PostForm("post_url")] = c.PostForm("post_secret")
-	}
-	if err := conf.Save(global.DefaultConfFile); err != nil {
-		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-	} else {
-		JSONConfig = nil
-		c.JSON(200, coolq.OK(coolq.MSG{}))
-	}
-}
+// // AdminDoConfigHTTP HTTP配置修改
+// func AdminDoConfigHTTP(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	p, _ := strconv.ParseUint(c.PostForm("port"), 10, 16)
+// 	conf.HTTPConfig.Port = uint16(p)
+// 	conf.HTTPConfig.Host = c.PostForm("host")
+// 	if c.PostForm("enable") == "true" {
+// 		conf.HTTPConfig.Enabled = true
+// 	} else {
+// 		conf.HTTPConfig.Enabled = false
+// 	}
+// 	t, _ := strconv.ParseInt(c.PostForm("timeout"), 10, 32)
+// 	conf.HTTPConfig.Timeout = int32(t)
+// 	if c.PostForm("post_url") != "" {
+// 		conf.HTTPConfig.PostUrls[c.PostForm("post_url")] = c.PostForm("post_secret")
+// 	}
+// 	if err := conf.Save(global.DefaultConfFile); err != nil {
+// 		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 	} else {
+// 		JSONConfig = nil
+// 		c.JSON(200, coolq.OK(coolq.MSG{}))
+// 	}
+// }
 
-// AdminDoConfigWS ws配置修改
-func AdminDoConfigWS(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	p, _ := strconv.ParseUint(c.PostForm("port"), 10, 16)
-	conf.WSConfig.Port = uint16(p)
-	conf.WSConfig.Host = c.PostForm("host")
-	if c.PostForm("enable") == "true" {
-		conf.WSConfig.Enabled = true
-	} else {
-		conf.WSConfig.Enabled = false
-	}
-	if err := conf.Save(global.DefaultConfFile); err != nil {
-		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-	} else {
-		JSONConfig = nil
-		c.JSON(200, coolq.OK(coolq.MSG{}))
-	}
-}
+// // AdminDoConfigWS ws配置修改
+// func AdminDoConfigWS(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	p, _ := strconv.ParseUint(c.PostForm("port"), 10, 16)
+// 	conf.WSConfig.Port = uint16(p)
+// 	conf.WSConfig.Host = c.PostForm("host")
+// 	if c.PostForm("enable") == "true" {
+// 		conf.WSConfig.Enabled = true
+// 	} else {
+// 		conf.WSConfig.Enabled = false
+// 	}
+// 	if err := conf.Save(global.DefaultConfFile); err != nil {
+// 		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 	} else {
+// 		JSONConfig = nil
+// 		c.JSON(200, coolq.OK(coolq.MSG{}))
+// 	}
+// }
 
-// AdminDoConfigReverseWS 反向ws配置修改
-func AdminDoConfigReverseWS(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	conf.ReverseServers[0].ReverseAPIURL = c.PostForm("reverse_api_url")
-	conf.ReverseServers[0].ReverseURL = c.PostForm("reverse_url")
-	conf.ReverseServers[0].ReverseEventURL = c.PostForm("reverse_event_url")
-	t, _ := strconv.ParseUint(c.PostForm("reverse_reconnect_interval"), 10, 16)
-	conf.ReverseServers[0].ReverseReconnectInterval = uint16(t)
-	if c.PostForm("enable") == "true" {
-		conf.ReverseServers[0].Enabled = true
-	} else {
-		conf.ReverseServers[0].Enabled = false
-	}
-	if err := conf.Save(global.DefaultConfFile); err != nil {
-		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-	} else {
-		JSONConfig = nil
-		c.JSON(200, coolq.OK(coolq.MSG{}))
-	}
-}
+// // AdminDoConfigReverseWS 反向ws配置修改
+// func AdminDoConfigReverseWS(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	conf.ReverseServers[0].ReverseAPIURL = c.PostForm("reverse_api_url")
+// 	conf.ReverseServers[0].ReverseURL = c.PostForm("reverse_url")
+// 	conf.ReverseServers[0].ReverseEventURL = c.PostForm("reverse_event_url")
+// 	t, _ := strconv.ParseUint(c.PostForm("reverse_reconnect_interval"), 10, 16)
+// 	conf.ReverseServers[0].ReverseReconnectInterval = uint16(t)
+// 	if c.PostForm("enable") == "true" {
+// 		conf.ReverseServers[0].Enabled = true
+// 	} else {
+// 		conf.ReverseServers[0].Enabled = false
+// 	}
+// 	if err := conf.Save(global.DefaultConfFile); err != nil {
+// 		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 	} else {
+// 		JSONConfig = nil
+// 		c.JSON(200, coolq.OK(coolq.MSG{}))
+// 	}
+// }
 
-// AdminDoConfigJSON config.hjson配置修改
-func AdminDoConfigJSON(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	JSON := c.PostForm("json")
-	err := json.Unmarshal([]byte(JSON), &conf)
-	if err != nil {
-		log.Warnf("尝试加载配置文件 %v 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-		return
-	}
-	if err := conf.Save(global.DefaultConfFile); err != nil {
-		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
-		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
-	} else {
-		JSONConfig = nil
-		c.JSON(200, coolq.OK(coolq.MSG{}))
-	}
-}
+// // AdminDoConfigJSON config.hjson配置修改
+// func AdminDoConfigJSON(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	JSON := c.PostForm("json")
+// 	err := json.Unmarshal([]byte(JSON), &conf)
+// 	if err != nil {
+// 		log.Warnf("尝试加载配置文件 %v 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 		return
+// 	}
+// 	if err := conf.Save(global.DefaultConfFile); err != nil {
+// 		log.Fatalf("保存 %s 时出现错误: %v", global.DefaultConfFile, err)
+// 		c.JSON(200, Failed(502, "保存 "+global.DefaultConfFile+" 时出现错误:"+fmt.Sprintf("%v", err)))
+// 	} else {
+// 		JSONConfig = nil
+// 		c.JSON(200, coolq.OK(coolq.MSG{}))
+// 	}
+// }
 
-// AdminGetConfigJSON 拉取config.hjson配置
-func AdminGetConfigJSON(s *webServer, c *gin.Context) {
-	conf := GetConf()
-	c.JSON(200, coolq.OK(coolq.MSG{"config": conf}))
-}
+// // AdminGetConfigJSON 拉取config.hjson配置
+// func AdminGetConfigJSON(s *webServer, c *gin.Context) {
+// 	conf := GetConf()
+// 	c.JSON(200, coolq.OK(coolq.MSG{"config": conf}))
+// }
