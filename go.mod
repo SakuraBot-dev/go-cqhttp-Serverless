@@ -27,7 +27,7 @@ require (
 	github.com/tidwall/gjson v1.6.8
 	github.com/tidwall/pretty v1.1.0 // indirect
 	github.com/ugorji/go v1.2.4 // indirect
-	github.com/wdvxdr1123/go-silk v0.0.0-20210222130408-591ac9cef582
+	github.com/wdvxdr1123/go-silk v0.0.0-20210316130616-d47b553def60
 	github.com/yinghau76/go-ascii-art v0.0.0-20190517192627-e7f465a30189
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
@@ -35,5 +35,4 @@ require (
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	modernc.org/libc v1.8.0 // indirect
 )

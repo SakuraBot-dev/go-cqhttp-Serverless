@@ -30,7 +30,7 @@ var json = jsoniter.ConfigCompatibleWithStandardLibrary
 type CQBot struct {
 	Client *client.QQClient
 
-	events         []func(MSG)
+	events         []func(*bytes.Buffer)
 	db             *leveldb.DB
 	friendReqCache sync.Map
 	tempMsgCache   sync.Map
@@ -108,7 +108,7 @@ func NewQQBot(cli *client.QQClient, conf *global.JSONConfig) *CQBot {
 }
 
 // OnEventPush 注册事件上报函数
-func (bot *CQBot) OnEventPush(f func(m MSG)) {
+func (bot *CQBot) OnEventPush(f func(buf *bytes.Buffer)) {
 	bot.events = append(bot.events, f)
 }
 
@@ -118,7 +118,8 @@ func (bot *CQBot) GetMessage(mid int32) MSG {
 		m := MSG{}
 		data, err := bot.db.Get(binary.ToBytes(mid), nil)
 		if err == nil {
-			buff := new(bytes.Buffer)
+			buff := global.NewBuffer()
+			defer global.PutBuffer(buff)
 			buff.Write(binary.GZipUncompress(data))
 			err = gob.NewDecoder(buff).Decode(&m)
 			if err == nil {
@@ -345,7 +346,8 @@ func (bot *CQBot) InsertGroupMessage(m *message.GroupMessage) int32 {
 	}
 	id := toGlobalID(m.GroupCode, m.Id)
 	if bot.db != nil {
-		buf := new(bytes.Buffer)
+		buf := global.NewBuffer()
+		defer global.PutBuffer(buf)
 		if err := gob.NewEncoder(buf).Encode(val); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
@@ -370,7 +372,8 @@ func (bot *CQBot) InsertPrivateMessage(m *message.PrivateMessage) int32 {
 	}
 	id := toGlobalID(m.Sender.Uin, m.Id)
 	if bot.db != nil {
-		buf := new(bytes.Buffer)
+		buf := global.NewBuffer()
+		defer global.PutBuffer(buf)
 		if err := gob.NewEncoder(buf).Encode(val); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
@@ -397,7 +400,8 @@ func (bot *CQBot) InsertTempMessage(target int64, m *message.TempMessage) int32 
 	}
 	id := toGlobalID(m.Sender.Uin, m.Id)
 	if bot.db != nil {
-		buf := new(bytes.Buffer)
+		buf := global.NewBuffer()
+		defer global.PutBuffer(buf)
 		if err := gob.NewEncoder(buf).Encode(val); err != nil {
 			log.Warnf("记录聊天数据时出现错误: %v", err)
 			return -1
@@ -427,21 +431,28 @@ func (bot *CQBot) dispatchEventMessage(m MSG) {
 		log.Debug("Event filtered!")
 		return
 	}
+	buf := global.NewBuffer()
+	wg := sync.WaitGroup{}
+	wg.Add(len(bot.events))
+	_ = json.NewEncoder(buf).Encode(m)
 	for _, f := range bot.events {
-		go func(fn func(MSG)) {
+		go func(fn func(*bytes.Buffer)) {
 			defer func() {
+				wg.Done()
 				if pan := recover(); pan != nil {
 					log.Warnf("处理事件 %v 时出现错误: %v \n%s", m, pan, debug.Stack())
 				}
 			}()
 			start := time.Now()
-			fn(m)
+			fn(buf)
 			end := time.Now()
 			if end.Sub(start) > time.Second*5 {
 				log.Debugf("警告: 事件处理耗时超过 5 秒 (%v), 请检查应用是否有堵塞.", end.Sub(start))
 			}
 		}(f)
 	}
+	wg.Wait()
+	global.PutBuffer(buf)
 }
 
 func (bot *CQBot) formatGroupMessage(m *message.GroupMessage) MSG {
