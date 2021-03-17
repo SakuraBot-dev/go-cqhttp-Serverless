@@ -15,13 +15,12 @@ import (
 
 // SCFEvent 云函数Event结构体
 type SCFEvent struct {
-	ContentType string                          `json:"content-type"`
-	RequestCtx  events.APIGatewayRequestContext `json:"requestContext"`
-	Method      string                          `json:"httpMethod"`
-	Path        string                          `json:"path"`
-	QueryString events.APIGatewayQueryString    `json:"queryString"`
-	Body        string                          `json:"body"`
-	Headers     map[string]string               `json:"headers"`
+	ContentType string                       `json:"content-type"`
+	Method      string                       `json:"httpMethod"`
+	Path        string                       `json:"path"`
+	QueryString events.APIGatewayQueryString `json:"queryString"`
+	Body        string                       `json:"body"`
+	Headers     map[string]string            `json:"headers"`
 }
 
 type scfServer struct {
@@ -70,7 +69,7 @@ func (s *scfEntry) UpServer(b *coolq.CQBot) {
 }
 
 // SCFHandler 云函数回调
-func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayReponse, err error) {
+func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayResponse, err error) {
 	lc, _ := functioncontext.FromContext(ctx)
 	res := coolq.MSG{}
 	if !IsUp {
@@ -83,39 +82,41 @@ func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayReponse, e
 		if authToken != "" {
 			if auth := event.Headers["Authorization"]; auth != "" {
 				if strings.SplitN(auth, " ", 2)[1] != authToken {
-					return FailedGateway(401, "Unauthorized"), nil
+					return GatewayResponse(401, `{"status":"Unauthorized"}`), nil
 				}
 			} else if event.QueryString["access_token"] == nil || event.QueryString["access_token"][0] != authToken {
-				return FailedGateway(401, "Unauthorized"), nil
+				return GatewayResponse(401, `{"status":"Unauthorized"}`), nil
 			}
 			action := strings.ReplaceAll(event.Path, "_async", "")
 			log.Debugf("SCFServer接收到API调用: %v", action)
 			action = strings.Replace(event.Path, "/", "", 1)
 			res = SCFServer.api.callAPI(action, event)
-			res["request_id"] = lc.RequestID
 		}
 	}
-	return OKGateway(res), nil
+	if Debug {
+		res["raw"] = event
+	}
+	res["request_id"] = lc.RequestID
+	return GatewayResponse(200, res), nil
 }
 
 func (e SCFEvent) Get(k string) gjson.Result {
 	if q := e.QueryString[k]; q != nil {
 		return gjson.Result{Type: gjson.String, Str: q[0]}
 	}
-	// TODO: POST不太好使，debug中
 	if e.Method == "POST" {
-		if strings.Contains(e.ContentType, "application/x-www-form-urlencoded") {
+		if strings.Contains(e.Headers["content-type"], "application/x-www-form-urlencoded") {
 			return gjson.Result{Type: gjson.String, Str: e.Body}
 		}
-		if strings.Contains(e.ContentType, "application/json") {
-			return gjson.Get(strings.ReplaceAll(e.Body, "\\", ""), k)
+		if strings.Contains(e.Headers["content-type"], "application/json") {
+			return gjson.Get(e.Body, k)
 		}
 	}
 	return gjson.Result{Type: gjson.Null, Str: ""}
 }
 
-// APIGateWwayReponse API网关集成响应结构体
-type APIGatewayReponse struct {
+// APIGateWwayResponse API网关集成响应结构体
+type APIGatewayResponse struct {
 	IsBase64Encoded bool `json:"isBase64Encoded"`
 	StatusCode      int  `json:"statusCode"`
 	Headers         struct {
@@ -124,28 +125,13 @@ type APIGatewayReponse struct {
 	Body string `json:"body"`
 }
 
-// OKGateway API网关集成响应OK
-func OKGateway(data interface{}) *APIGatewayReponse {
+// GatewayResponse 构建API网关集成响应结构体
+func GatewayResponse(code int, data interface{}) *APIGatewayResponse {
 	dataByte, err := json.Marshal(data)
 	if err != nil {
 		log.Error(err.Error())
 	}
-	res := &APIGatewayReponse{
-		IsBase64Encoded: false,
-		StatusCode:      200,
-		Headers: struct {
-			ContentType string "json:\"Content-Type\""
-		}{
-			ContentType: "application/json; charset=utf-8",
-		},
-		Body: string(dataByte),
-	}
-	return res
-}
-
-// FailedGateway API网关集成响应Fail
-func FailedGateway(code int, msg ...string) *APIGatewayReponse {
-	res := &APIGatewayReponse{
+	res := &APIGatewayResponse{
 		IsBase64Encoded: false,
 		StatusCode:      code,
 		Headers: struct {
@@ -153,7 +139,7 @@ func FailedGateway(code int, msg ...string) *APIGatewayReponse {
 		}{
 			ContentType: "application/json; charset=utf-8",
 		},
-		Body: strings.Join(msg, " "),
+		Body: string(dataByte),
 	}
 	return res
 }
