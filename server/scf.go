@@ -80,12 +80,14 @@ func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayResponse, 
 	} else {
 		authToken := SCFEntry.apiAdmin.Conf.AccessToken
 		if authToken != "" {
-			if auth := event.Headers["Authorization"]; auth != "" {
+			if auth := event.Headers["authorization"]; auth != "" {
 				if strings.SplitN(auth, " ", 2)[1] != authToken {
-					return GatewayResponse(401, `{"status":"Unauthorized"}`), nil
+					res["status"] = "Unauthorized"
+					return GatewayResponse(401, res), nil
 				}
 			} else if event.QueryString["access_token"] == nil || event.QueryString["access_token"][0] != authToken {
-				return GatewayResponse(401, `{"status":"Unauthorized"}`), nil
+				res["status"] = "Unauthorized"
+				return GatewayResponse(401, res), nil
 			}
 			action := strings.ReplaceAll(event.Path, "_async", "")
 			log.Debugf("SCFServer接收到API调用: %v", action)

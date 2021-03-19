@@ -3,5 +3,5 @@
         "formatting.gofumpt": true,
         "formatting.local": "github.com/Mrs4s/go-cqhttp"
     },
-    "go.lintOnSave": "file"
+    "go.lintOnSave": "off"
 }
