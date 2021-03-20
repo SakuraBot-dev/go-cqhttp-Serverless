@@ -10,3 +10,4 @@ tmp/
 gocq
 *.zip
 *.http
+_*

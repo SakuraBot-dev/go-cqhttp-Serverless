@@ -15,7 +15,7 @@ import (
 
 // SCFEvent 云函数Event结构体
 type SCFEvent struct {
-	ContentType string                       `json:"content-type"`
+	Type        string                       `json:"type"`
 	Method      string                       `json:"httpMethod"`
 	Path        string                       `json:"path"`
 	QueryString events.APIGatewayQueryString `json:"queryString"`
@@ -72,27 +72,34 @@ func (s *scfEntry) UpServer(b *coolq.CQBot) {
 func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayResponse, err error) {
 	lc, _ := functioncontext.FromContext(ctx)
 	res := coolq.MSG{}
-	if !IsUp {
+	switch IsUp {
+	case false:
 		log.Debugf("go-cqhttp-Serverless接收到Api调用，正在启动中")
 		res = coolq.OK(coolq.MSG{
 			"SCFStatus": "Starting",
 		})
-	} else {
-		authToken := SCFEntry.apiAdmin.Conf.AccessToken
-		if authToken != "" {
-			if auth := event.Headers["authorization"]; auth != "" {
-				if strings.SplitN(auth, " ", 2)[1] != authToken {
+	default:
+		if event.Type == "Timer" {
+			log.Debugf("go-cqhttp-Serverless接收到定时器调用")
+			res = coolq.OK(coolq.MSG{"SCFStatus": "OKTimer"})
+		} else {
+			authToken := SCFEntry.apiAdmin.Conf.AccessToken
+			if authToken != "" {
+				if auth := event.Headers["authorization"]; auth != "" {
+					if strings.SplitN(auth, " ", 2)[1] != authToken {
+						res["status"] = "Unauthorized"
+						return GatewayResponse(401, res), nil
+					}
+				}
+				if event.QueryString["access_token"] == nil || event.QueryString["access_token"][0] != authToken {
 					res["status"] = "Unauthorized"
 					return GatewayResponse(401, res), nil
 				}
-			} else if event.QueryString["access_token"] == nil || event.QueryString["access_token"][0] != authToken {
-				res["status"] = "Unauthorized"
-				return GatewayResponse(401, res), nil
+				action := strings.ReplaceAll(event.Path, "_async", "")
+				log.Debugf("SCFServer接收到API调用: %v", action)
+				action = strings.Replace(event.Path, "/", "", 1)
+				res = SCFServer.api.callAPI(action, event)
 			}
-			action := strings.ReplaceAll(event.Path, "_async", "")
-			log.Debugf("SCFServer接收到API调用: %v", action)
-			action = strings.Replace(event.Path, "/", "", 1)
-			res = SCFServer.api.callAPI(action, event)
 		}
 	}
 	if Debug {

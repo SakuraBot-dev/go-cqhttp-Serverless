@@ -228,4 +228,3 @@ func (c *webSocketConn) handleRequest(_ *coolq.CQBot, payload []byte) {
 	defer c.Unlock()
 	_ = c.WriteJSON(ret)
 }
-
