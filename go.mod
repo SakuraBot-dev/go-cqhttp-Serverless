@@ -8,7 +8,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gin-gonic/gin v1.6.3 // indirect
 	github.com/gorilla/websocket v1.4.2
-	github.com/guonaihong/gout v0.1.5
+	github.com/guonaihong/gout v0.1.6
 	github.com/hjson/hjson-go v3.1.0+incompatible
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/json-iterator/go v1.1.10
@@ -23,12 +23,12 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/t-tomalak/logrus-easy-formatter v0.0.0-20190827215021-c074f06c5816
 	github.com/tencentyun/scf-go-lib v0.0.0-20200624065115-ba679e2ec9c9
-	github.com/tidwall/gjson v1.6.8
+	github.com/tidwall/gjson v1.7.2
 	github.com/tuotoo/qrcode v0.0.0-20190222102259-ac9c44189bf2
 	github.com/wdvxdr1123/go-silk v0.0.0-20210316130616-d47b553def60
 	github.com/willf/bitset v1.1.11 // indirect
-	golang.org/x/crypto v0.0.0-20210314154223-e6e6c4f2bb5b
-	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
+	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
+	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
