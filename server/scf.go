@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Mrs4s/MiraiGo/client"
+	jsoniter "github.com/json-iterator/go"
 	log "github.com/sirupsen/logrus"
 	"github.com/tencentyun/scf-go-lib/events"
 	"github.com/tencentyun/scf-go-lib/functioncontext"
@@ -24,47 +24,23 @@ type SCFEvent struct {
 }
 
 type scfServer struct {
-	api *apiCaller
+	api       *apiCaller
+	authToken string
 }
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // SCFServer SCF服务器
 var SCFServer = &scfServer{
-	api: &apiCaller{
-		bot: &coolq.CQBot{},
-	},
-}
-
-type scfEntry struct {
-	apiAdmin *webServer
-}
-
-// SCFEntry SCF入口点
-var SCFEntry = &scfEntry{
-	apiAdmin: &webServer{},
+	api: &apiCaller{},
 }
 
 // IsUp GoCQ是否已启动
 var IsUp = false
 
-func (s *scfEntry) Run(cli *client.QQClient) *coolq.CQBot {
-	s.apiAdmin.Cli = cli
-	s.apiAdmin.Conf = GetConf()
-	JSONConfig = s.apiAdmin.Conf
-	s.apiAdmin.Dologin()
-	b := s.apiAdmin.bot // 外部引入 bot对象，用于操作bot
-	s.UpServer(b)
-	return b
-}
-
-func (s *scfEntry) UpServer(b *coolq.CQBot) {
-	conf := s.apiAdmin.Conf
-	for k, v := range conf.HTTPConfig.PostUrls {
-		newHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, s.apiAdmin.bot)
-	}
-	for _, rc := range conf.ReverseServers {
-		go NewWebSocketClient(rc, conf.AccessToken, s.apiAdmin.bot).Run()
-	}
-	SCFServer.api.bot = b
+func (s *scfServer) Run(authToken string, bot *coolq.CQBot) {
+	s.api.bot = bot
+	s.authToken = authToken
 	IsUp = true
 }
 
@@ -83,7 +59,7 @@ func SCFHandler(ctx context.Context, event SCFEvent) (data *APIGatewayResponse, 
 			log.Debugf("go-cqhttp-Serverless接收到定时器调用")
 			res = coolq.OK(coolq.MSG{"SCFStatus": "OKTimer"})
 		} else {
-			authToken := SCFEntry.apiAdmin.Conf.AccessToken
+			authToken := SCFServer.authToken
 			if authToken != "" {
 				if auth := event.Headers["authorization"]; auth != "" {
 					if strings.SplitN(auth, " ", 2)[1] != authToken {

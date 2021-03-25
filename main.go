@@ -285,25 +285,7 @@ func main() {
 		log.Infof("收到服务器地址更新通知, 将在下一次重连时应用. ")
 		return true
 	})
-	/*
-		if conf.WebUI == nil {
-			conf.WebUI = &global.GoCQWebUI{
-				Enabled:   true,
-				WebInput:  false,
-				Host:      "0.0.0.0",
-				WebUIPort: 9999,
-			}
-		}
-		if conf.WebUI.WebUIPort <= 0 {
-			conf.WebUI.WebUIPort = 9999
-		}
-		if conf.WebUI.Host == "" {
-			conf.WebUI.Host = "127.0.0.1"
-		}
-	*/
 	global.Proxy = conf.ProxyRewrite
-	// b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
-	// c := server.Console
 	isQRCodeLogin := conf.Uin == 0 || len(conf.Password) == 0
 	if !isQRCodeLogin {
 		if err := commonLogin(); err != nil {
@@ -363,27 +345,22 @@ func main() {
 	coolq.IgnoreInvalidCQCode = conf.IgnoreInvalidCQCode
 	coolq.SplitURL = conf.FixURL
 	coolq.ForceFragmented = conf.ForceFragmented
-	// if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
-	// 	go server.CQHTTPApiServer.Run(fmt.Sprintf("%s:%d", conf.HTTPConfig.Host, conf.HTTPConfig.Port), conf.AccessToken, bot)
-	// 	for k, v := range conf.HTTPConfig.PostUrls {
-	// 		server.NewHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, bot)
-	// 	}
-	// }
-	// if conf.WSConfig != nil && conf.WSConfig.Enabled {
-	// 	go server.WebSocketServer.Run(fmt.Sprintf("%s:%d", conf.WSConfig.Host, conf.WSConfig.Port), conf.AccessToken, bot)
-	// }
+	if conf.HTTPConfig != nil && conf.HTTPConfig.Enabled {
+		go server.SCFServer.Run(conf.AccessToken, bot)
+		for k, v := range conf.HTTPConfig.PostUrls {
+			server.NewHTTPClient().Run(k, v, conf.HTTPConfig.Timeout, bot)
+		}
+	}
+	for _, rc := range conf.ReverseServers {
+		go server.NewWebSocketClient(rc, conf.AccessToken, bot).Run()
+	}
 	global.Proxy = conf.ProxyRewrite
-	// b := server.WebServer.Run(fmt.Sprintf("%s:%d", conf.WebUI.Host, conf.WebUI.WebUIPort), cli)
-	// b := server.SCFEntry.Run(cli)
-	// c := server.Console
-	// r := server.Restart
 	for _, rc := range conf.ReverseServers {
 		go server.NewWebSocketClient(rc, conf.AccessToken, bot).Run()
 	}
 	log.Info("资源初始化完成, 开始处理信息.")
 	log.Info("アトリは、高性能ですから!")
 	c := make(chan os.Signal, 1)
-	// go checkUpdate()
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 }
@@ -437,38 +414,6 @@ func OldPasswordDecrypt(encryptedPassword string, key []byte) string {
 	}
 	return string(tea.Decrypt(encrypted))
 }
-
-// func restart(args []string) {
-// 	var cmd *exec.Cmd
-// 	if runtime.GOOS == "windows" {
-// 		file, err := exec.LookPath(args[0])
-// 		if err != nil {
-// 			log.Errorf("重启失败:%s", err.Error())
-// 			return
-// 		}
-// 		path, err := filepath.Abs(file)
-// 		if err != nil {
-// 			log.Errorf("重启失败:%s", err.Error())
-// 		}
-// 		args = append([]string{"/c", "start ", path, "faststart"}, args[1:]...)
-// 		cmd = &exec.Cmd{
-// 			Path:   "cmd.exe",
-// 			Args:   args,
-// 			Stderr: os.Stderr,
-// 			Stdout: os.Stdout,
-// 		}
-// 	} else {
-// 		args = append(args, "faststart")
-// 		cmd = &exec.Cmd{
-// 			Path:   args[0],
-// 			Args:   args,
-// 			Stderr: os.Stderr,
-// 			Stdout: os.Stdout,
-// 		}
-// 	}
-// 	_ = cmd.Start()
-// }
-
 
 func getConfig() *global.JSONConfig {
 	var conf *global.JSONConfig
