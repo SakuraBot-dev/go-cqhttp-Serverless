@@ -23,7 +23,8 @@ import (
 // 	api    apiCaller
 // }
 
-type httpClient struct {
+// HTTPClient 反向HTTP上报客户端
+type HTTPClient struct {
 	bot     *coolq.CQBot
 	secret  string
 	addr    string
@@ -101,11 +102,13 @@ var Debug = false
 // 	}()
 // }
 
-func newHTTPClient() *httpClient {
-	return &httpClient{}
+// NewHTTPClient 返回反向HTTP客户端
+func NewHTTPClient() *HTTPClient {
+	return &HTTPClient{}
 }
 
-func (c *httpClient) Run(addr, secret string, timeout int32, bot *coolq.CQBot) {
+// Run 运行反向HTTP服务
+func (c *HTTPClient) Run(addr, secret string, timeout int32, bot *coolq.CQBot) {
 	c.bot = bot
 	c.secret = secret
 	c.addr = addr
@@ -117,7 +120,7 @@ func (c *httpClient) Run(addr, secret string, timeout int32, bot *coolq.CQBot) {
 	log.Infof("HTTP POST上报器已启动: %v", addr)
 }
 
-func (c *httpClient) onBotPushEvent(m *bytes.Buffer) {
+func (c *HTTPClient) onBotPushEvent(m *bytes.Buffer) {
 	var res string
 	err := gout.POST(c.addr).SetJSON(m.Bytes()).BindBody(&res).SetHeader(func() gout.H {
 		h := gout.H{

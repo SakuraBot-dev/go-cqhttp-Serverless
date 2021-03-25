@@ -146,7 +146,7 @@ func (c *WebSocketClient) connectUniversal() {
 }
 
 func (c *WebSocketClient) listenAPI(conn *webSocketConn, u bool) {
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	for {
 		buffer := global.NewBuffer()
 		t, reader, err := conn.NextReader()
@@ -213,7 +213,7 @@ func (c *webSocketConn) handleRequest(_ *coolq.CQBot, payload []byte) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Printf("处置WS命令时发生无法恢复的异常：%v\n%s", err, debug.Stack())
-			c.Close()
+			_ = c.Close()
 		}
 	}()
 	global.RateLimit(context.Background())
