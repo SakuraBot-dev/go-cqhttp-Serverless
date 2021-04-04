@@ -21,7 +21,6 @@ import (
 	"github.com/Mrs4s/go-cqhttp/coolq"
 	"github.com/Mrs4s/go-cqhttp/global"
 	"github.com/Mrs4s/go-cqhttp/global/terminal"
-	"github.com/Mrs4s/go-cqhttp/global/update"
 	"github.com/Mrs4s/go-cqhttp/server"
 
 	"github.com/Mrs4s/MiraiGo/binary"
