@@ -4,11 +4,11 @@ go 1.16
 
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
-	github.com/Mrs4s/MiraiGo v0.0.0-20210323143736-d233c90d5083
+	github.com/Mrs4s/MiraiGo v0.0.0-20210404081916-0346596c7196
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gin-gonic/gin v1.6.3 // indirect
 	github.com/gorilla/websocket v1.4.2
-	github.com/guonaihong/gout v0.1.6
+	github.com/guonaihong/gout v0.1.8
 	github.com/hjson/hjson-go v3.1.0+incompatible
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/json-iterator/go v1.1.10
@@ -23,7 +23,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/t-tomalak/logrus-easy-formatter v0.0.0-20190827215021-c074f06c5816
 	github.com/tencentyun/scf-go-lib v0.0.0-20200624065115-ba679e2ec9c9
-	github.com/tidwall/gjson v1.7.2
+	github.com/tidwall/gjson v1.7.4
 	github.com/tuotoo/qrcode v0.0.0-20190222102259-ac9c44189bf2
 	github.com/wdvxdr1123/go-silk v0.0.0-20210316130616-d47b553def60
 	github.com/willf/bitset v1.1.11 // indirect
