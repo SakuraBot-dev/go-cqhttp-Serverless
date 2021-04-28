@@ -11,7 +11,7 @@ require (
 	github.com/guonaihong/gout v0.1.8
 	github.com/hjson/hjson-go v3.1.0+incompatible
 	github.com/jonboulle/clockwork v0.2.2 // indirect
-	github.com/json-iterator/go v1.1.10
+	github.com/json-iterator/go v1.1.11
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
