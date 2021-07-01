@@ -23,7 +23,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/t-tomalak/logrus-easy-formatter v0.0.0-20190827215021-c074f06c5816
 	github.com/tencentyun/scf-go-lib v0.0.0-20200624065115-ba679e2ec9c9
-	github.com/tidwall/gjson v1.8.0
+	github.com/tidwall/gjson v1.8.1
 	github.com/tuotoo/qrcode v0.0.0-20190222102259-ac9c44189bf2
 	github.com/wdvxdr1123/go-silk v0.0.0-20210316130616-d47b553def60
 	github.com/willf/bitset v1.1.11 // indirect
