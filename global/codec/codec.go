@@ -14,7 +14,7 @@ import (
 	"github.com/wdvxdr1123/go-silk"
 )
 
-const silkCachePath = "data/cache"
+const silkCachePath = "/mnt/data/cache"
 
 // EncodeToSilk 将音频编码为Silk
 func EncodeToSilk(record []byte, tempName string, useCache bool) (silkWav []byte, err error) {

@@ -20,7 +20,7 @@ func EncoderSilk(data []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "calc md5 failed")
 	}
 	tempName := fmt.Sprintf("%x", h.Sum(nil))
-	if silkPath := path.Join("data/cache", tempName+".silk"); PathExists(silkPath) {
+	if silkPath := path.Join("/mnt/data/cache", tempName+".silk"); PathExists(silkPath) {
 		return ioutil.ReadFile(silkPath)
 	}
 	slk, err := codec.EncodeToSilk(data, tempName, true)

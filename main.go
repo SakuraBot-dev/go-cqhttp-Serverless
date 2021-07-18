@@ -88,7 +88,7 @@ func init() {
 		rotateOptions = append(rotateOptions, rotatelogs.ForceNewFile())
 	}
 
-	w, err := rotatelogs.New(path.Join("logs", "%Y-%m-%d.log"), rotateOptions...)
+	w, err := rotatelogs.New(path.Join("/mnt/logs", "%Y-%m-%d.log"), rotateOptions...)
 	if err != nil {
 		log.Errorf("rotatelogs init err: %v", err)
 		panic(err)

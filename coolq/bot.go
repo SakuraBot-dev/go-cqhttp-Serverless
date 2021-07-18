@@ -89,12 +89,12 @@ func NewQQBot(cli *client.QQClient, conf *config.Config) *CQBot {
 		enableLevelDB = lconf.Enable
 	}
 	if enableLevelDB {
-		p := path.Join("data", "leveldb")
+		p := path.Join("/mnt/data", "leveldb")
 		db, err := leveldb.OpenFile(p, &opt.Options{
 			WriteBuffer: 128 * opt.KiB,
 		})
 		if err != nil {
-			log.Fatalf("打开数据库失败, 如果频繁遇到此问题请清理 data/leveldb 文件夹或关闭数据库功能。")
+			log.Fatalf("打开数据库失败, 如果频繁遇到此问题请清理 /mnt/data/leveldb 文件夹或关闭数据库功能。")
 		}
 		bot.db = db
 		gob.Register(message.Sender{})
